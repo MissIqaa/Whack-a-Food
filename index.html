@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whack-a-Food</title>
+    <style>
+        /* --- CSS Variables & Global Styles --- */
+        :root {
+            --primary: #ff6b81;
+            --secondary: #1dd1a1;
+            --warning: #ff9f43;
+            --dark: #2f3542;
+            --light: #f1f2f6;
+            --bg-color: #70a1ff;
+            --hole-color: #57606f;
+            --board-bg: #eccc68;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Fredoka One', sans-serif;
+            background-color: var(--bg-color);
+            background-image: repeating-linear-gradient(
+                45deg,
+                rgba(255, 255, 255, 0.1) 0px,
+                rgba(255, 255, 255, 0.1) 20px,
+                transparent 20px,
+                transparent 40px
+            );
+            color: var(--dark);
+            text-align: center;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        h1 {
+            font-size: 3rem;
+            color: white;
+            text-shadow: 3px 3px 0 var(--dark), -1px -1px 0 var(--dark), 1px -1px 0 var(--dark), -1px 1px 0 var(--dark), 1px 1px 0 var(--dark);
+            margin-bottom: 20px;
+            animation: bounceIn 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* --- UI Containers --- */
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            max-width: 600px;
+            width: 100%;
+            position: relative;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* --- Buttons --- */
+        .btn-group {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            font-family: inherit;
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 12px 24px;
+            border: 4px solid var(--dark);
+            border-radius: 50px;
+            cursor: pointer;
+            background: var(--light);
+            color: var(--dark);
+            box-shadow: 0 5px 0 var(--dark);
+            transition: all 0.1s;
+            outline: none;
+        }
+
+        button:active {
+            transform: translateY(5px);
+            box-shadow: 0 0 0 var(--dark);
+        }
+
+        button.selected-mode {
+            background: var(--primary);
+            color: white;
+        }
+        button.selected-diff {
+            background: var(--warning);
+            color: white;
+        }
+
+        .start-btn {
+            background: var(--secondary);
+            color: white;
+            font-size: 1.8rem;
+            padding: 15px 40px;
+            border-radius: 15px;
+            margin-top: 10px;
+            width: 100%;
+        }
+
+        /* --- Game Stats --- */
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            background: var(--dark);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 15px;
+            border: 4px solid rgba(255,255,255,0.2);
+        }
+
+        .mode-display {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        /* --- Game Board --- */
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            background: var(--board-bg);
+            padding: 20px;
+            border-radius: 20px;
+            border: 6px solid #d4a742;
+        }
+
+        .hole {
+            background: var(--hole-color);
+            border-radius: 50%;
+            aspect-ratio: 1; /* Makes it a perfect circle/square */
+            position: relative;
+            overflow: hidden;
+            border: 6px solid #2f3542;
+            box-shadow: inset 0 15px 25px rgba(0,0,0,0.6);
+        }
+
+        .food {
+            position: absolute;
+            bottom: -100%; /* Hidden by default */
+            left: 10%;
+            width: 80%;
+            height: 80%;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: bottom 0.1s ease-in; /* Fast down */
+            cursor: pointer;
+            border: 4px solid var(--dark);
+            box-shadow: 0 8px 0 var(--dark);
+        }
+
+        /* The 'up' class triggers the pop-up animation */
+        .hole.up .food {
+            bottom: 10%;
+            transition: bottom 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Bouncy up */
+        }
+
+        .food:active {
+            transform: scale(0.9);
+            box-shadow: 0 4px 0 var(--dark);
+            bottom: 6%; /* Slight push down when clicked */
+        }
+
+        .food .emoji {
+            font-size: 3.5rem;
+            line-height: 1.1;
+            pointer-events: none; /* Let clicks pass through to .food */
+        }
+
+        .food .name {
+            font-size: 0.9rem;
+            font-weight: bold;
+            pointer-events: none;
+            line-height: 1;
+        }
+
+        /* --- Floating Score Animation --- */
+        .floating-score {
+            position: absolute;
+            font-size: 2.5rem;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 10;
+            animation: floatUp 0.8s ease-out forwards;
+        }
+        
+        .score-pos {
+            color: #2ed573;
+            text-shadow: 2px 2px 0 var(--dark);
+        }
+        
+        .score-neg {
+            color: #ff4757;
+            text-shadow: 2px 2px 0 var(--dark);
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-60px) scale(1.5); }
+        }
+
+        @keyframes bounceIn {
+            0% { transform: scale(0); }
+            80% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* --- Responsive Tweaks --- */
+        @media (max-width: 500px) {
+            h1 { font-size: 2.2rem; }
+            .container { padding: 15px; }
+            .food .emoji { font-size: 2.5rem; }
+            .food .name { font-size: 0.75rem; }
+            .stats { font-size: 1.3rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Whack-a-Food!</h1>
+
+    <!-- MAIN MENU -->
+    <div id="menu" class="container">
+        <h2>Select Your Mission:</h2>
+        <br>
+        <div class="btn-group">
+            <button id="btn-healthy" class="mode-btn selected-mode" onclick="setMode('healthy')">Whack Healthy</button>
+            <button id="btn-unhealthy" class="mode-btn" onclick="setMode('unhealthy')">Whack Unhealthy</button>
+        </div>
+
+        <h2>Select Difficulty:</h2>
+        <br>
+        <div class="btn-group">
+            <button id="btn-easy" class="diff-btn selected-diff" onclick="setDifficulty('easy')">Easy</button>
+            <button id="btn-medium" class="diff-btn" onclick="setDifficulty('medium')">Medium</button>
+            <button id="btn-hard" class="diff-btn" onclick="setDifficulty('hard')">Hard</button>
+        </div>
+
+        <button class="start-btn" onclick="startGame()">▶ START GAME</button>
+    </div>
+
+    <!-- GAME BOARD -->
+    <div id="game" class="container hidden">
+        <div class="stats">
+            <div>⏱ Time: <span id="time-display">30</span></div>
+            <div>⭐ Score: <span id="score-display">0</span></div>
+        </div>
+        <div class="mode-display">
+            🎯 Current Target: <span id="current-target-display">Healthy Foods</span>
+        </div>
+        
+        <div class="board">
+            <!-- 9 Holes generated via HTML to keep structure clear -->
+            <div class="hole" id="hole-0"><div class="food"><div class="emoji"></div><div class="name"></div></div></div>
+            <div class="hole" id="hole-1"><div class="food"><div class="emoji"></div><div class="name"></div></div></div>
+            <div class="hole" id="hole-2"><div class="food"><div class="emoji"></div><div class="name"></div></div></div>
+            <div class="hole" id="hole-3"><div class="food"><div class="emoji"></div><div class="name"></div></div></div>
+            <div class="hole" id="hole-4"><div class="food"><div class="emoji"></div><div class="name"></div></div></div>
+            <div class="hole" id="hole-5"><div class="food"><div class="emoji"></div><div class="name"></div></div></div>
+            <div class="hole" id="hole-6"><div class="food"><div class="emoji"></div><div class="name"></div></div></div>
+            <div class="hole" id="hole-7"><div class="food"><div class="emoji"></div><div class="name"></div></div></div>
+            <div class="hole" id="hole-8"><div class="food"><div class="emoji"></div><div class="name"></div></div></div>
+        </div>
+    </div>
+
+    <!-- GAME OVER SCREEN -->
+    <div id="game-over" class="container hidden">
+        <h2 style="font-size: 2.5rem; margin-bottom: 10px;">Game Over!</h2>
+        <p style="font-size: 1.5rem; margin-bottom: 20px;">Your Score: <strong id="final-score" style="font-size: 2rem; color: var(--primary);">0</strong></p>
+        <button class="start-btn" onclick="showMenu()">Play Again 🔄</button>
+    </div>
+
+    <script>
+        // --- Game Data ---
+        const healthyData = [
+            { name: 'Bread', emoji: '🍞' }, { name: 'Tomatoes', emoji: '🍅' },
+            { name: 'Onion', emoji: '🧅' }, { name: 'Lettuce', emoji: '🥬' },
+            { name: 'Baked beans', emoji: '🥫' }, { name: 'Carrots', emoji: '🥕' },
+            { name: 'Spaghetti', emoji: '🍝' }, { name: 'Bananas', emoji: '🍌' },
+            { name: 'Apple', emoji: '🍎' }, { name: 'Chicken', emoji: '🍗' },
+            { name: 'Radish', emoji: '🥗' }, { name: 'Sauce', emoji: '🥣' },
+            { name: 'Biscuits', emoji: '🍪' }
+        ].map(item => ({ ...item, type: 'healthy' }));
+
+        const unhealthyData = [
+            { name: 'Jam', emoji: '🍯' }, { name: 'Margarine', emoji: '🧈' },
+            { name: 'Cheese', emoji: '🧀' }, { name: 'Burger', emoji: '🍔' },
+            { name: 'Chips', emoji: '🍟' }, { name: 'Crisps', emoji: '🥔' },
+            { name: 'Cake', emoji: '🍰' }, { name: 'Candies', emoji: '🍬' },
+            { name: 'Chocolate', emoji: '🍫' }, { name: 'Sweets', emoji: '🍭' },
+            { name: 'Cream', emoji: '🍦' }, { name: 'Custard', emoji: '🍮' }
+        ].map(item => ({ ...item, type: 'unhealthy' }));
+
+        const allFoods = [...healthyData, ...unhealthyData];
+
+        // --- Game State ---
+        let currentMode = 'healthy'; // 'healthy' or 'unhealthy'
+        let currentDifficulty = 'easy';
+        let score = 0;
+        let timeLeft = 30;
+        let isPlaying = false;
+        let lastHole = null;
+        let timerInterval = null;
+        let popTimeouts = [];
+
+        // DOM Elements
+        const holes = document.querySelectorAll('.hole');
+        const foods = document.querySelectorAll('.food');
+        const scoreDisplay = document.getElementById('score-display');
+        const timeDisplay = document.getElementById('time-display');
+        const finalScore = document.getElementById('final-score');
+        const targetDisplay = document.getElementById('current-target-display');
+
+        const menuScreen = document.getElementById('menu');
+        const gameScreen = document.getElementById('game');
+        const gameOverScreen = document.getElementById('game-over');
+
+        // --- Audio System (Synthesized sounds, no external files) ---
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'pop') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(600, now + 0.1);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'hit') {
+                // Happy chime
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(500, now);
+                osc.frequency.exponentialRampToValueAtTime(1000, now + 0.1);
+                osc.frequency.exponentialRampToValueAtTime(1500, now + 0.2);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'wrong') {
+                // Angry buzzer
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.2);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            }
+        }
+
+        // --- UI Setup ---
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('selected-mode'));
+            document.getElementById(`btn-${mode}`).classList.add('selected-mode');
+        }
+
+        function setDifficulty(diff) {
+            currentDifficulty = diff;
+            document.querySelectorAll('.diff-btn').forEach(btn => btn.classList.remove('selected-diff'));
+            document.getElementById(`btn-${diff}`).classList.add('selected-diff');
+        }
+
+        function showMenu() {
+            gameOverScreen.classList.add('hidden');
+            gameScreen.classList.add('hidden');
+            menuScreen.classList.remove('hidden');
+        }
+
+        // --- Game Logic ---
+        function randomTime(min, max) {
+            return Math.round(Math.random() * (max - min) + min);
+        }
+
+        function randomHole(holesList) {
+            const idx = Math.floor(Math.random() * holesList.length);
+            const hole = holesList[idx];
+            // Prevent same hole back to back
+            if (hole === lastHole) {
+                return randomHole(holesList);
+            }
+            lastHole = hole;
+            return hole;
+        }
+
+        function randomFood() {
+            const idx = Math.floor(Math.random() * allFoods.length);
+            return allFoods[idx];
+        }
+
+        function showFloatingText(hole, text, isPositive) {
+            const floatEl = document.createElement('div');
+            floatEl.textContent = text;
+            floatEl.className = `floating-score ${isPositive ? 'score-pos' : 'score-neg'}`;
+            
+            // Position near the center of the hole
+            const rect = hole.getBoundingClientRect();
+            floatEl.style.left = `${rect.width / 2 - 20}px`;
+            floatEl.style.top = `${rect.height / 2 - 20}px`;
+            
+            hole.appendChild(floatEl);
+
+            // Cleanup after animation
+            setTimeout(() => {
+                floatEl.remove();
+            }, 800);
+        }
+
+        function popFood() {
+            if (!isPlaying) return;
+
+            // Define timing based on difficulty
+            let minTime, maxTime;
+            if (currentDifficulty === 'easy') { minTime = 1000; maxTime = 1500; }
+            else if (currentDifficulty === 'medium') { minTime = 700; maxTime = 1100; }
+            else { minTime = 500; maxTime = 800; }
+
+            const time = randomTime(minTime, maxTime);
+            const hole = randomHole(holes);
+            const foodData = randomFood();
+
+            // Populate DOM
+            const foodEl = hole.querySelector('.food');
+            const emojiEl = hole.querySelector('.emoji');
+            const nameEl = hole.querySelector('.name');
+
+            emojiEl.textContent = foodData.emoji;
+            nameEl.textContent = foodData.name;
+            foodEl.dataset.type = foodData.type;
+            foodEl.dataset.whacked = "false"; // Reset whacked state
+
+            // Animate up
+            hole.classList.add('up');
+            playSound('pop');
+
+            // Hide after 'time' ms, then schedule next pop
+            const timeoutId = setTimeout(() => {
+                hole.classList.remove('up');
+                if (isPlaying) popFood();
+            }, time);
+
+            popTimeouts.push(timeoutId);
+        }
+
+        function whack(e) {
+            if (!isPlaying) return;
+            const foodEl = e.currentTarget;
+            const hole = foodEl.parentElement;
+
+            // Only score if it's currently up and hasn't been whacked this cycle
+            if (!hole.classList.contains('up') || foodEl.dataset.whacked === "true") return;
+
+            // Prevent double clicks
+            foodEl.dataset.whacked = "true";
+            
+            const foodType = foodEl.dataset.type;
+            const isCorrect = (foodType === currentMode);
+
+            if (isCorrect) {
+                score++;
+                playSound('hit');
+                showFloatingText(hole, "+1", true);
+            } else {
+                score--;
+                playSound('wrong');
+                showFloatingText(hole, "-1", false);
+            }
+
+            scoreDisplay.textContent = score;
+            
+            // Force it down immediately on hit
+            hole.classList.remove('up');
+        }
+
+        function startGame() {
+            initAudio(); // Required to bypass browser autoplay restrictions
+            
+            score = 0;
+            timeLeft = 30;
+            scoreDisplay.textContent = score;
+            timeDisplay.textContent = timeLeft;
+            isPlaying = true;
+            popTimeouts = [];
+
+            // Update UI
+            targetDisplay.textContent = currentMode === 'healthy' ? '🍎 Healthy Foods' : '🍔 Unhealthy Foods';
+            targetDisplay.style.color = currentMode === 'healthy' ? 'var(--secondary)' : 'var(--warning)';
+
+            menuScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+
+            // Start timer
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timeDisplay.textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+
+            // Determine concurrent loops based on difficulty
+            let concurrentLoops = 1;
+            if (currentDifficulty === 'medium') concurrentLoops = 2;
+            if (currentDifficulty === 'hard') concurrentLoops = 3;
+
+            // Start popping loops with slight staggers
+            for(let i=0; i<concurrentLoops; i++) {
+                setTimeout(popFood, i * 400); 
+            }
+        }
+
+        function endGame() {
+            isPlaying = false;
+            clearInterval(timerInterval);
+            
+            // Clear all active timeouts
+            popTimeouts.forEach(clearTimeout);
+            
+            // Force all holes down
+            holes.forEach(hole => hole.classList.remove('up'));
+
+            // Show Game Over
+            setTimeout(() => {
+                gameScreen.classList.add('hidden');
+                gameOverScreen.classList.remove('hidden');
+                finalScore.textContent = score;
+            }, 500); // slight delay to let foods animate down
+        }
+
+        // Attach click listeners to all food items
+        foods.forEach(food => {
+            food.addEventListener('mousedown', whack);
+            // Support touch screens smoothly
+            food.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // Prevent duplicate mousedown events
+                whack(e);
+            }, {passive: false});
+        });
+
+    </script>
+</body>
+</html>
